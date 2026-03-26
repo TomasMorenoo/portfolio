@@ -1,0 +1,7 @@
+services:
+  portfolio:
+    build: .
+    container_name: mi-portfolio-web
+    restart: always
+    ports:
+      - "5004:80"

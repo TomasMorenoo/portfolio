@@ -1,0 +1,33 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Mi Portfolio | Programador & Técnico">
+	<main class="min-h-screen flex flex-col items-center justify-center p-6 text-center">
+		<div class="space-y-6 max-w-2xl">
+			<h1 class="text-5xl md:text-7xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
+				Portfolio en camino...
+			</h1>
+			<p class="text-xl md:text-2xl text-slate-400">
+				Hardware, Software y todo lo que hay en el medio.
+			</p>
+			
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-12">
+				<div class="p-6 border border-slate-700 rounded-2xl bg-slate-800/50">
+					<h3 class="text-xl font-semibold mb-2 text-blue-300">💻 Dev Mode</h3>
+					<p class="text-sm text-slate-400 italic">Escribiendo código de alto rendimiento.</p>
+				</div>
+				<div class="p-6 border border-slate-700 rounded-2xl bg-slate-800/50">
+					<h3 class="text-xl font-semibold mb-2 text-emerald-300">🛠️ Tech Mode</h3>
+					<p class="text-sm text-slate-400 italic">Reparando y optimizando hardware.</p>
+				</div>
+			</div>
+
+			<div class="mt-8 p-4 bg-slate-800 border-l-4 border-yellow-500 rounded shadow-lg">
+				<p class="text-sm text-yellow-500 font-mono">
+					Status: Deploying on Docker VPS...
+				</p>
+			</div>
+		</div>
+	</main>
+</Layout>
