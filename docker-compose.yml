@@ -4,4 +4,12 @@ services:
     container_name: mi-portfolio-web
     restart: always
     ports:
-      - "5004:80"
+      - "5004:4321"  
+    environment:
+      - HOST=0.0.0.0
+      - PORT=4321
+    volumes:
+      - ./data:/app/data                            
+      - ./public/uploads:/app/public/uploads        
+    env_file:
+      - .env                                        
