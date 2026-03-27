@@ -1,0 +1,16 @@
+# Secretos
+.env
+.env.production
+.env.local
+
+# Base de Datos local
+*.db
+*.db-journal
+
+# Archivos subidos
+public/uploads/*
+!public/uploads/.gitkeep
+node_modules/
+dist/
+.DS_Store
+docker-compose.dev.yml

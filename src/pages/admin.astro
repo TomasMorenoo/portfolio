@@ -1,0 +1,192 @@
+---
+import Layout from '../layouts/Layout.astro';
+import AdminNavbar from '../components/AdminNavbar.astro';
+import db from '../lib/db.js';
+import fs from 'node:fs';
+import path from 'node:path';
+
+let mensaje = "";
+let autorizado = false;
+const passwordSistema = import.meta.env.ADMIN_PASSWORD;
+const cookiePass = Astro.cookies.get('admin_auth')?.value;
+
+if (cookiePass === passwordSistema) autorizado = true;
+
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const accion = data.get('accion');
+
+  if (accion === 'login') {
+    if (data.get('password') === passwordSistema) {
+      Astro.cookies.set('admin_auth', passwordSistema, { path: '/' });
+      return Astro.redirect('/admin');
+    }
+  }
+
+  if (autorizado) {
+    if (accion === 'actualizar_perfil') {
+      const cvFile = data.get('cv_file');
+      const row = db.prepare("SELECT valor FROM configuracion WHERE clave = 'cv_url'").get();
+      let cvUrl = row ? row.valor : "";
+
+      if (cvFile && cvFile.size > 0) {
+        const buffer = Buffer.from(await cvFile.arrayBuffer());
+        const fileName = `cv-mobatai.pdf`; 
+        const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+        if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+        fs.writeFileSync(path.join(uploadDir, fileName), buffer);
+        cvUrl = `/uploads/${fileName}?v=${Date.now()}`;
+      }
+
+      const update = db.prepare('UPDATE configuracion SET valor = ? WHERE clave = ?');
+      update.run(data.get('nombre'), 'nombre');
+      update.run(data.get('email'), 'email');
+      update.run(data.get('bio'), 'bio');
+      update.run(cvUrl, 'cv_url');
+      update.run(data.get('whatsapp_number'), 'whatsapp_number');
+      update.run(data.get('whatsapp_msg'), 'whatsapp_msg');
+      update.run(data.get('disponible') ? 'true' : 'false', 'disponible');
+      
+      // Nuevos campos Sobre Mí
+      update.run(data.get('sobre_mi_id'), 'sobre_mi_id');
+      update.run(data.get('sobre_mi_base'), 'sobre_mi_base');
+      update.run(data.get('sobre_mi_status'), 'sobre_mi_status');
+      update.run(data.get('sobre_mi_texto'), 'sobre_mi_texto');
+
+      mensaje = "✅ Sistema Sincronizado";
+    }
+
+    if (accion === 'guardar_proyecto') {
+      const imgFile = data.get('proyecto_img');
+      let imagenUrl = "";
+      if (imgFile && imgFile.size > 0) {
+        const buffer = Buffer.from(await imgFile.arrayBuffer());
+        const imgName = `p-${Date.now()}.webp`;
+        const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+        if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+        fs.writeFileSync(path.join(uploadDir, imgName), buffer);
+        imagenUrl = `/uploads/${imgName}`;
+      }
+      db.prepare('INSERT INTO proyectos (titulo, descripcion, tags, tipo, imagen_url, demo_url) VALUES (?, ?, ?, ?, ?, ?)').run(
+        data.get('titulo'), data.get('descripcion'), data.get('tags'), data.get('tipo'), imagenUrl, data.get('demo_url')
+      );
+      mensaje = "🚀 Proyecto Desplegado";
+    }
+
+    if (accion === 'borrar_proyecto') {
+      db.prepare('DELETE FROM proyectos WHERE id = ?').run(data.get('id'));
+      mensaje = "🗑️ Eliminado";
+    }
+  }
+}
+
+// Carga de datos
+const configArr = db.prepare('SELECT * FROM configuracion').all();
+const config = Object.fromEntries(configArr.map(i => [i.clave, i.valor]));
+const proyectosDB = db.prepare('SELECT * FROM proyectos ORDER BY id DESC').all();
+---
+
+<Layout title="Admin Mobatai">
+  {autorizado ? <AdminNavbar /> : null}
+
+  <main class="pt-24 px-6 max-w-5xl mx-auto text-white pb-32">
+    {!autorizado ? (
+      <div class="max-w-md mx-auto bg-slate-900 p-10 rounded-[2rem] border border-white/5 mt-20 text-center">
+         <h1 class="text-2xl font-black italic mb-8 uppercase">Mobatai <span class="text-blue-500">Root</span></h1>
+         <form method="POST">
+           <input type="hidden" name="accion" value="login" />
+           <input type="password" name="password" class="w-full bg-slate-800 p-4 rounded-xl border border-white/5 text-center mb-6 outline-none" placeholder="KEY" />
+           <button class="w-full bg-blue-600 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest">Entrar</button>
+         </form>
+      </div>
+    ) : (
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        
+        <div class="lg:col-span-1 space-y-6">
+          <section class="bg-slate-900/80 p-6 rounded-[2rem] border border-white/10 backdrop-blur-xl">
+             <h2 class="text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-6 border-b border-white/5 pb-4">Ajustes Globales</h2>
+             
+             <form method="POST" enctype="multipart/form-data" class="space-y-4">
+                <input type="hidden" name="accion" value="actualizar_perfil" />
+                
+                <label class="flex items-center gap-3 bg-slate-800/30 p-3 rounded-xl border border-white/5 cursor-pointer">
+                    <input type="checkbox" name="disponible" checked={config.disponible === 'true'} class="w-4 h-4 accent-emerald-500" />
+                    <span class="text-[10px] font-bold uppercase tracking-tighter">Disponible para trabajar</span>
+                </label>
+                
+                <input name="nombre" value={config.nombre} placeholder="Nombre Principal" class="w-full bg-slate-800 p-3 rounded-xl border border-white/5 text-xs" />
+                <input name="whatsapp_number" value={config.whatsapp_number} placeholder="WhatsApp (Ej: 54911...)" class="w-full bg-slate-800 p-3 rounded-xl border border-white/5 text-xs" />
+                <textarea name="whatsapp_msg" placeholder="Mensaje predeterminado de WhatsApp" class="w-full bg-slate-800 p-3 rounded-xl border border-white/5 text-xs h-20 resize-none">{config.whatsapp_msg}</textarea>
+                <textarea name="bio" placeholder="Biografía corta del Hero" class="w-full bg-slate-800 p-3 rounded-xl border border-white/5 text-xs h-24 resize-none">{config.bio}</textarea>
+                
+                <div class="p-4 bg-blue-500/5 border border-blue-500/10 rounded-xl">
+                    <p class="text-[9px] font-black text-blue-400 block mb-2 uppercase">CV PDF</p>
+                    <input type="file" name="cv_file" accept=".pdf" class="text-[9px] text-slate-500 mb-2" />
+                    {config.cv_url ? (
+                      <a href={config.cv_url} target="_blank" class="text-[9px] text-blue-400 underline block">Ver actual</a>
+                    ) : null}
+                </div>
+
+                <div class="pt-4 mt-4 border-t border-white/5 space-y-3">
+                    <p class="text-[9px] font-black uppercase text-purple-400">Perfil del Operador</p>
+                    <input name="sobre_mi_id" value={config.sobre_mi_id} placeholder="ID Usuario (Ej: Tomas A. Moreno)" class="w-full bg-slate-800 p-3 rounded-xl border border-white/5 text-xs" />
+                    <input name="sobre_mi_base" value={config.sobre_mi_base} placeholder="Base (Ej: Buenos Aires, ARG)" class="w-full bg-slate-800 p-3 rounded-xl border border-white/5 text-xs" />
+                    <input name="sobre_mi_status" value={config.sobre_mi_status} placeholder="Status (Ej: Estudiante UTN)" class="w-full bg-slate-800 p-3 rounded-xl border border-white/5 text-xs" />
+                    <textarea name="sobre_mi_texto" placeholder="Texto descriptivo. Usá Enter para separar párrafos." class="w-full bg-slate-800 p-3 rounded-xl border border-white/5 text-xs h-32 resize-none">{config.sobre_mi_texto}</textarea>
+                </div>
+
+                <button class="w-full bg-emerald-600 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all hover:bg-emerald-500">Sincronizar Datos</button>
+             </form>
+          </section>
+        </div>
+
+        <div class="lg:col-span-2 space-y-10">
+          <section class="bg-slate-900 p-8 rounded-[2.5rem] border border-white/10">
+            <h2 class="text-xl font-black italic uppercase text-blue-500 mb-8 border-b border-white/5 pb-4">Nuevo Proyecto</h2>
+            <form method="POST" enctype="multipart/form-data" class="space-y-4">
+              <input type="hidden" name="accion" value="guardar_proyecto" />
+              <div class="grid grid-cols-2 gap-4">
+                <input name="titulo" placeholder="Título" class="bg-slate-800 p-4 rounded-xl border border-white/5 text-sm" required />
+                <select name="tipo" class="bg-slate-800 p-4 rounded-xl border border-white/5 text-[10px] font-black uppercase outline-none">
+                   <option value="SOFTWARE">SOFTWARE</option>
+                   <option value="HARDWARE">HARDWARE</option>
+                </select>
+              </div>
+              <textarea name="descripcion" placeholder="Descripción técnica del desarrollo..." class="w-full bg-slate-800 p-4 rounded-xl border border-white/5 h-24 text-sm resize-none outline-none"></textarea>
+              <div class="grid grid-cols-2 gap-4">
+                 <input name="tags" placeholder="Tags separados por coma (Docker, Python...)" class="bg-slate-800 p-3 rounded-xl border border-white/5 text-sm outline-none" />
+                 <input name="demo_url" placeholder="URL Demo/GitHub" class="bg-slate-800 p-3 rounded-xl border border-white/5 text-sm outline-none" />
+              </div>
+              <div class="p-4 bg-slate-800 border border-white/5 rounded-xl">
+                 <input type="file" name="proyecto_img" accept="image/*" class="text-[9px] text-slate-500" />
+              </div>
+              <button class="w-full bg-blue-600 py-5 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-blue-500 transition-all">Desplegar en DB</button>
+            </form>
+          </section>
+
+          <div class="space-y-3">
+             {proyectosDB.map(p => (
+               <div class="flex items-center justify-between p-4 bg-slate-900/40 rounded-2xl border border-white/5">
+                 <div class="flex items-center gap-4 text-xs font-bold uppercase">
+                   <img src={p.imagen_url || '/placeholder.webp'} class="w-10 h-10 rounded-lg object-cover" />
+                   {p.titulo}
+                 </div>
+                 <form method="POST">
+                   <input type="hidden" name="accion" value="borrar_proyecto" />
+                   <input type="hidden" name="id" value={p.id} />
+                   <button class="text-[9px] font-black text-red-400 uppercase px-3 py-2 rounded-lg hover:bg-red-400/10">Borrar</button>
+                 </form>
+               </div>
+             ))}
+          </div>
+        </div>
+      </div>
+    )}
+  </main>
+  
+  {mensaje ? (
+    <div class="fixed bottom-10 right-10 bg-white text-black px-8 py-4 rounded-2xl font-black z-50 animate-bounce text-[10px] uppercase shadow-2xl">
+      {mensaje}
+    </div>
+  ) : null}
+</Layout>

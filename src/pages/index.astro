@@ -1,33 +1,198 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import Navbar from '../components/Navbar.astro';
+import Footer from '../components/Footer.astro';
+import db from '../lib/db.js';
+
+// Carga de DB
+const configArr = db.prepare('SELECT * FROM configuracion').all();
+const config = Object.fromEntries(configArr.map(i => [i.clave, i.valor]));
+const proyectosDB = db.prepare('SELECT * FROM proyectos ORDER BY id DESC').all();
+
+// Link de WhatsApp
+const WHATSAPP_LINK = `https://wa.me/${config.whatsapp_number}?text=${encodeURIComponent(config.whatsapp_msg || '')}`;
 ---
 
-<Layout title="Mi Portfolio | Programador & Técnico">
-	<main class="min-h-screen flex flex-col items-center justify-center p-6 text-center">
-		<div class="space-y-6 max-w-2xl">
-			<h1 class="text-5xl md:text-7xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
-				Portfolio en camino...
-			</h1>
-			<p class="text-xl md:text-2xl text-slate-400">
-				Hardware, Software y todo lo que hay en el medio.
-			</p>
-			
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-12">
-				<div class="p-6 border border-slate-700 rounded-2xl bg-slate-800/50">
-					<h3 class="text-xl font-semibold mb-2 text-blue-300">💻 Dev Mode</h3>
-					<p class="text-sm text-slate-400 italic">Escribiendo código de alto rendimiento.</p>
-				</div>
-				<div class="p-6 border border-slate-700 rounded-2xl bg-slate-800/50">
-					<h3 class="text-xl font-semibold mb-2 text-emerald-300">🛠️ Tech Mode</h3>
-					<p class="text-sm text-slate-400 italic">Reparando y optimizando hardware.</p>
-				</div>
-			</div>
+<Layout title={`${config.nombre} | Portfolio`}>
+  <Navbar />
+  
+  <main class="pt-32 px-6 max-w-6xl mx-auto pb-32">
+    
+    <section class="flex flex-col items-center text-center space-y-8 mb-40">
+      
+      {config.disponible === 'true' ? (
+        <div class="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-full">
+          <span class="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span class="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Disponible para trabajar</span>
+        </div>
+      ) : (
+        <div class="inline-flex items-center gap-2 bg-slate-800/50 border border-slate-700 px-4 py-2 rounded-full">
+          <span class="flex h-2 w-2 rounded-full bg-slate-500"></span>
+          <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">No disponible para trabajos</span>
+        </div>
+      )}
 
-			<div class="mt-8 p-4 bg-slate-800 border-l-4 border-yellow-500 rounded shadow-lg">
-				<p class="text-sm text-yellow-500 font-mono">
-					Status: Deploying on Docker VPS...
-				</p>
-			</div>
-		</div>
-	</main>
+      <div class="flex flex-col items-center justify-center space-y-6 pt-4">
+        <div class="flex items-center gap-4 text-slate-500">
+           <div class="h-px w-8 md:w-12 bg-slate-700"></div>
+           <span class="text-[10px] md:text-xs font-black uppercase tracking-[0.4em]">Hola, soy</span>
+           <div class="h-px w-8 md:w-12 bg-slate-700"></div>
+        </div>
+        
+        <h1 class="text-7xl md:text-9xl font-black italic uppercase tracking-tighter text-white drop-shadow-2xl">
+          {config.nombre}
+        </h1>
+      </div>
+      
+      <p class="text-xl text-slate-400 max-w-2xl italic mx-auto">
+        {config.bio}
+      </p>
+
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4 w-full max-w-2xl pt-8">
+        <a href="#proyectos" class="w-full sm:w-1/3 bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-white px-6 py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] text-center">
+          Proyectos
+        </a>
+        
+        {config.disponible === 'true' ? (
+          <a href={WHATSAPP_LINK} target="_blank" class="w-full sm:w-1/3 bg-emerald-600 hover:bg-emerald-500 transition-all text-white px-6 py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] text-center shadow-xl shadow-emerald-600/20">
+            Contacto Directo
+          </a>
+        ) : (
+          <div class="w-full sm:w-1/3 bg-slate-800/30 border border-slate-700/50 text-slate-500 px-4 py-5 rounded-2xl font-black uppercase tracking-widest text-[9px] text-center cursor-not-allowed select-none transition-all">
+            No disponible para contacto
+          </div>
+        )}
+        
+        {config.cv_url ? (
+          <a href={config.cv_url} download class="w-full sm:w-1/3 bg-blue-600/10 border border-blue-500/20 hover:bg-blue-600/20 transition-all text-blue-400 px-6 py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] text-center">
+            Descargar CV
+          </a>
+        ) : null}
+      </div>
+    </section>
+
+    <section class="mb-40 scroll-mt-32">
+      <div class="flex items-center gap-6 mb-16 px-2">
+        <h2 class="text-2xl md:text-4xl font-black italic uppercase tracking-tighter text-white">Laboratorio</h2>
+        <div class="h-px flex-grow bg-white/5"></div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        <div class="bg-slate-900/40 border border-white/5 p-8 rounded-[2rem] hover:border-blue-500/30 transition-all group">
+          <div class="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center mb-6 text-blue-400 group-hover:scale-110 transition-transform">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+          </div>
+          <h3 class="text-lg font-black uppercase tracking-tight text-white mb-3">Programación Web</h3>
+          <p class="text-sm text-slate-400 leading-relaxed font-light">
+            Desarrollo de interfaces modernas y paneles de gestión a medida utilizando tecnologías ágiles para asegurar velocidad y escalabilidad.
+          </p>
+        </div>
+
+        <div class="bg-slate-900/40 border border-white/5 p-8 rounded-[2rem] hover:border-emerald-500/30 transition-all group">
+          <div class="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-6 text-emerald-400 group-hover:scale-110 transition-transform">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+          </div>
+          <h3 class="text-lg font-black uppercase tracking-tight text-white mb-3">Automatización</h3>
+          <p class="text-sm text-slate-400 leading-relaxed font-light">
+            Creación de scripts en Python e integración de inteligencia artificial para optimizar tareas repetitivas y mejorar flujos de trabajo.
+          </p>
+        </div>
+
+        <div class="bg-slate-900/40 border border-white/5 p-8 rounded-[2rem] hover:border-purple-500/30 transition-all group">
+          <div class="w-12 h-12 bg-purple-500/10 rounded-2xl flex items-center justify-center mb-6 text-purple-400 group-hover:scale-110 transition-transform">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+          </div>
+          <h3 class="text-lg font-black uppercase tracking-tight text-white mb-3">Soporte IT</h3>
+          <p class="text-sm text-slate-400 leading-relaxed font-light">
+            Diagnóstico avanzado, resolución de conflictos de hardware/software y mantenimiento preventivo de infraestructura técnica.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="mb-40 scroll-mt-32">
+      <div class="flex items-center gap-6 mb-16 px-2">
+        <h2 class="text-2xl md:text-4xl font-black italic uppercase tracking-tighter text-white">Sobre Mí</h2>
+        <div class="h-px flex-grow bg-white/5"></div>
+      </div>
+
+      <div class="bg-slate-900/20 border border-white/5 p-8 md:p-12 rounded-[2.5rem] flex flex-col md:flex-row gap-12 items-center md:items-start relative">
+        
+        <div class="w-full md:w-1/3 flex flex-col gap-6 relative z-10">
+          <div class="w-24 h-24 bg-slate-800 rounded-full border-2 border-slate-700 flex items-center justify-center text-slate-500 overflow-hidden shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          </div>
+          
+          <div class="space-y-4">
+            <div>
+              <p class="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Operador</p>
+              <p class="text-sm font-bold text-white uppercase tracking-tight">{config.sobre_mi_id || 'Mobatai Admin'}</p>
+            </div>
+            <div>
+              <p class="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Base</p>
+              <p class="text-sm font-bold text-white uppercase tracking-tight">{config.sobre_mi_base || 'No especificada'}</p>
+            </div>
+            <div>
+              <p class="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">Status</p>
+              <p class="text-sm font-bold text-emerald-400 uppercase tracking-tight">{config.sobre_mi_status || 'Operativo'}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="w-full md:w-2/3 space-y-6 text-slate-300 font-light leading-relaxed text-base relative z-10">
+          {config.sobre_mi_texto ? (
+             config.sobre_mi_texto.split('\n').map((parrafo) => (
+                parrafo.trim() ? <p>{parrafo}</p> : null
+             ))
+          ) : (
+            <p>Esperando datos de inicialización del operador...</p>
+          )}
+        </div>
+      </div>
+    </section>
+
+    <section id="proyectos" class="scroll-mt-32">
+      <div class="flex items-center gap-6 mb-16 px-2">
+        <h2 class="text-2xl md:text-4xl font-black italic uppercase tracking-tighter text-white">Proyectos</h2>
+        <div class="h-px flex-grow bg-white/5"></div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+        {proyectosDB.map((p) => (
+          <div class="group bg-slate-900/40 border border-white/5 rounded-[2.5rem] overflow-hidden hover:border-blue-500/40 transition-all duration-500 flex flex-col h-full shadow-2xl">
+            <div class="h-64 bg-slate-800 relative overflow-hidden">
+              <img src={p.imagen_url || '/placeholder.webp'} alt={p.titulo} class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-60 group-hover:opacity-100" />
+              <div class="absolute top-6 left-6 flex gap-2">
+                <span class="px-3 py-1 bg-black/80 backdrop-blur-md border border-white/10 rounded-full text-[9px] font-black uppercase tracking-widest text-blue-400">{p.tipo}</span>
+              </div>
+              {p.demo_url ? (
+                <a href={p.demo_url} target="_blank" class="absolute bottom-6 right-6 bg-blue-600 p-4 rounded-full text-white shadow-xl translate-y-24 group-hover:translate-y-0 transition-all duration-500 hover:bg-blue-500">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-7-7 7 7-7 7"/></svg>
+                </a>
+              ) : null}
+            </div>
+            <div class="p-8 flex flex-col flex-grow">
+              <h3 class="text-2xl font-bold mb-4 text-white uppercase italic tracking-tighter">{p.titulo}</h3>
+              <p class="text-slate-400 text-sm leading-relaxed mb-8 flex-grow line-clamp-3">{p.descripcion}</p>
+              <div class="flex flex-wrap gap-2 mt-auto border-t border-white/5 pt-6">
+                {p.tags?.split(',').map(tag => (
+                  <span class="text-[9px] font-black text-slate-600 uppercase">#{tag.trim()}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
+        
+        {proyectosDB.length === 0 ? (
+          <div class="col-span-1 md:col-span-2 text-center py-20 border border-dashed border-white/10 rounded-[2.5rem] bg-slate-900/10">
+            <p class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-700">Esperando carga de datos en Mobatai OS...</p>
+          </div>
+        ) : null}
+      </div>
+    </section>
+
+  </main>
+
+  <Footer />
 </Layout>
