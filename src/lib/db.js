@@ -31,6 +31,24 @@ db.exec(`
   );
 `);
 
+// ==========================================
+// AUTO-MIGRACIONES (Actualización inteligente)
+// ==========================================
+
+// Leemos la estructura actual de la tabla "proyectos"
+const columnasProyectos = db.prepare("PRAGMA table_info(proyectos)").all();
+
+// Nos fijamos si adentro de esas columnas existe 'github_url'
+const tieneGithubUrl = columnasProyectos.some(columna => columna.name === 'github_url');
+
+// Si no existe, ejecutamos el ALTER TABLE automáticamente sin romper nada
+if (!tieneGithubUrl) {
+  db.exec("ALTER TABLE proyectos ADD COLUMN github_url TEXT;");
+  console.log("🚀 Migración exitosa: Columna 'github_url' agregada automáticamente.");
+}
+
+// ==========================================
+
 // Inserción de configuración básica
 const seed = (clave, valor) => {
   db.prepare("INSERT OR IGNORE INTO configuracion (clave, valor) VALUES (?, ?)").run(clave, valor);

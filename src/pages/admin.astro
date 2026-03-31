@@ -25,6 +25,7 @@ if (Astro.request.method === 'POST') {
 
   if (autorizado) {
     if (accion === 'actualizar_perfil') {
+      
       const cvFile = data.get('cv_file');
       const row = db.prepare("SELECT valor FROM configuracion WHERE clave = 'cv_url'").get();
       let cvUrl = row ? row.valor : "";
@@ -38,20 +39,41 @@ if (Astro.request.method === 'POST') {
         cvUrl = `/uploads/${fileName}?v=${Date.now()}`;
       }
 
-      const update = db.prepare('UPDATE configuracion SET valor = ? WHERE clave = ?');
-      update.run(data.get('nombre'), 'nombre');
-      update.run(data.get('email'), 'email');
-      update.run(data.get('bio'), 'bio');
-      update.run(cvUrl, 'cv_url');
-      update.run(data.get('whatsapp_number'), 'whatsapp_number');
-      update.run(data.get('whatsapp_msg'), 'whatsapp_msg');
-      update.run(data.get('disponible') ? 'true' : 'false', 'disponible');
+      const avatarFile = data.get('avatar_file');
+      const rowAvatar = db.prepare("SELECT valor FROM configuracion WHERE clave = 'avatar_url'").get();
+      let avatarUrl = rowAvatar ? rowAvatar.valor : "";
+
+      if (avatarFile && avatarFile.size > 0) {
+        const buffer = Buffer.from(await avatarFile.arrayBuffer());
+        const ext = avatarFile.name.split('.').pop();
+        const fileName = `avatar-${Date.now()}.${ext}`; 
+        const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+        if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+        fs.writeFileSync(path.join(uploadDir, fileName), buffer);
+        avatarUrl = `/uploads/${fileName}`;
+      }
+
+      const safeUpdate = (clave, valor) => {
+         const res = db.prepare('UPDATE configuracion SET valor = ? WHERE clave = ?').run(valor, clave);
+         if (res.changes === 0) {
+            db.prepare('INSERT INTO configuracion (clave, valor) VALUES (?, ?)').run(clave, valor);
+         }
+      };
+
+      safeUpdate('nombre', data.get('nombre'));
+      safeUpdate('email', data.get('email'));
+      safeUpdate('bio', data.get('bio'));
+      safeUpdate('cv_url', cvUrl);
+      safeUpdate('avatar_url', avatarUrl);
+      safeUpdate('whatsapp_number', data.get('whatsapp_number'));
+      safeUpdate('whatsapp_msg', data.get('whatsapp_msg'));
+      safeUpdate('disponible', data.get('disponible') ? 'true' : 'false');
       
-      // Nuevos campos Sobre Mí
-      update.run(data.get('sobre_mi_id'), 'sobre_mi_id');
-      update.run(data.get('sobre_mi_base'), 'sobre_mi_base');
-      update.run(data.get('sobre_mi_status'), 'sobre_mi_status');
-      update.run(data.get('sobre_mi_texto'), 'sobre_mi_texto');
+      safeUpdate('sobre_mi_id', data.get('sobre_mi_id'));
+      safeUpdate('sobre_mi_base', data.get('sobre_mi_base'));
+      safeUpdate('sobre_mi_status', data.get('sobre_mi_status'));
+      safeUpdate('sobre_mi_texto', data.get('sobre_mi_texto'));
+      safeUpdate('radar_techs', data.get('radar_techs'));
 
       mensaje = "✅ Sistema Sincronizado";
     }
@@ -67,8 +89,8 @@ if (Astro.request.method === 'POST') {
         fs.writeFileSync(path.join(uploadDir, imgName), buffer);
         imagenUrl = `/uploads/${imgName}`;
       }
-      db.prepare('INSERT INTO proyectos (titulo, descripcion, tags, tipo, imagen_url, demo_url) VALUES (?, ?, ?, ?, ?, ?)').run(
-        data.get('titulo'), data.get('descripcion'), data.get('tags'), data.get('tipo'), imagenUrl, data.get('demo_url')
+      db.prepare('INSERT INTO proyectos (titulo, descripcion, tags, tipo, imagen_url, demo_url, github_url) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+        data.get('titulo'), data.get('descripcion'), data.get('tags'), data.get('tipo'), imagenUrl, data.get('demo_url'), data.get('github_url')
       );
       mensaje = "🚀 Proyecto Desplegado";
     }
@@ -80,7 +102,6 @@ if (Astro.request.method === 'POST') {
   }
 }
 
-// Carga de datos
 const configArr = db.prepare('SELECT * FROM configuracion').all();
 const config = Object.fromEntries(configArr.map(i => [i.clave, i.valor]));
 const proyectosDB = db.prepare('SELECT * FROM proyectos ORDER BY id DESC').all();
@@ -100,86 +121,184 @@ const proyectosDB = db.prepare('SELECT * FROM proyectos ORDER BY id DESC').all()
          </form>
       </div>
     ) : (
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+      
+      <div class="flex flex-col gap-16">
         
-        <div class="lg:col-span-1 space-y-6">
-          <section class="bg-slate-900/80 p-6 rounded-[2rem] border border-white/10 backdrop-blur-xl">
-             <h2 class="text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-6 border-b border-white/5 pb-4">Ajustes Globales</h2>
-             
-             <form method="POST" enctype="multipart/form-data" class="space-y-4">
-                <input type="hidden" name="accion" value="actualizar_perfil" />
-                
-                <label class="flex items-center gap-3 bg-slate-800/30 p-3 rounded-xl border border-white/5 cursor-pointer">
-                    <input type="checkbox" name="disponible" checked={config.disponible === 'true'} class="w-4 h-4 accent-emerald-500" />
-                    <span class="text-[10px] font-bold uppercase tracking-tighter">Disponible para trabajar</span>
-                </label>
-                
-                <input name="nombre" value={config.nombre} placeholder="Nombre Principal" class="w-full bg-slate-800 p-3 rounded-xl border border-white/5 text-xs" />
-                <input name="whatsapp_number" value={config.whatsapp_number} placeholder="WhatsApp (Ej: 54911...)" class="w-full bg-slate-800 p-3 rounded-xl border border-white/5 text-xs" />
-                <textarea name="whatsapp_msg" placeholder="Mensaje predeterminado de WhatsApp" class="w-full bg-slate-800 p-3 rounded-xl border border-white/5 text-xs h-20 resize-none">{config.whatsapp_msg}</textarea>
-                <textarea name="bio" placeholder="Biografía corta del Hero" class="w-full bg-slate-800 p-3 rounded-xl border border-white/5 text-xs h-24 resize-none">{config.bio}</textarea>
-                
-                <div class="p-4 bg-blue-500/5 border border-blue-500/10 rounded-xl">
-                    <p class="text-[9px] font-black text-blue-400 block mb-2 uppercase">CV PDF</p>
-                    <input type="file" name="cv_file" accept=".pdf" class="text-[9px] text-slate-500 mb-2" />
-                    {config.cv_url ? (
-                      <a href={config.cv_url} target="_blank" class="text-[9px] text-blue-400 underline block">Ver actual</a>
-                    ) : null}
-                </div>
-
-                <div class="pt-4 mt-4 border-t border-white/5 space-y-3">
-                    <p class="text-[9px] font-black uppercase text-purple-400">Perfil del Operador</p>
-                    <input name="sobre_mi_id" value={config.sobre_mi_id} placeholder="ID Usuario (Ej: Tomas A. Moreno)" class="w-full bg-slate-800 p-3 rounded-xl border border-white/5 text-xs" />
-                    <input name="sobre_mi_base" value={config.sobre_mi_base} placeholder="Base (Ej: Buenos Aires, ARG)" class="w-full bg-slate-800 p-3 rounded-xl border border-white/5 text-xs" />
-                    <input name="sobre_mi_status" value={config.sobre_mi_status} placeholder="Status (Ej: Estudiante UTN)" class="w-full bg-slate-800 p-3 rounded-xl border border-white/5 text-xs" />
-                    <textarea name="sobre_mi_texto" placeholder="Texto descriptivo. Usá Enter para separar párrafos." class="w-full bg-slate-800 p-3 rounded-xl border border-white/5 text-xs h-32 resize-none">{config.sobre_mi_texto}</textarea>
-                </div>
-
-                <button class="w-full bg-emerald-600 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all hover:bg-emerald-500">Sincronizar Datos</button>
-             </form>
-          </section>
-        </div>
-
-        <div class="lg:col-span-2 space-y-10">
-          <section class="bg-slate-900 p-8 rounded-[2.5rem] border border-white/10">
-            <h2 class="text-xl font-black italic uppercase text-blue-500 mb-8 border-b border-white/5 pb-4">Nuevo Proyecto</h2>
-            <form method="POST" enctype="multipart/form-data" class="space-y-4">
-              <input type="hidden" name="accion" value="guardar_proyecto" />
-              <div class="grid grid-cols-2 gap-4">
-                <input name="titulo" placeholder="Título" class="bg-slate-800 p-4 rounded-xl border border-white/5 text-sm" required />
-                <select name="tipo" class="bg-slate-800 p-4 rounded-xl border border-white/5 text-[10px] font-black uppercase outline-none">
-                   <option value="SOFTWARE">SOFTWARE</option>
-                   <option value="HARDWARE">HARDWARE</option>
-                </select>
-              </div>
-              <textarea name="descripcion" placeholder="Descripción técnica del desarrollo..." class="w-full bg-slate-800 p-4 rounded-xl border border-white/5 h-24 text-sm resize-none outline-none"></textarea>
-              <div class="grid grid-cols-2 gap-4">
-                 <input name="tags" placeholder="Tags separados por coma (Docker, Python...)" class="bg-slate-800 p-3 rounded-xl border border-white/5 text-sm outline-none" />
-                 <input name="demo_url" placeholder="URL Demo/GitHub" class="bg-slate-800 p-3 rounded-xl border border-white/5 text-sm outline-none" />
-              </div>
-              <div class="p-4 bg-slate-800 border border-white/5 rounded-xl">
-                 <input type="file" name="proyecto_img" accept="image/*" class="text-[9px] text-slate-500" />
-              </div>
-              <button class="w-full bg-blue-600 py-5 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-blue-500 transition-all">Desplegar en DB</button>
-            </form>
-          </section>
-
-          <div class="space-y-3">
-             {proyectosDB.map(p => (
-               <div class="flex items-center justify-between p-4 bg-slate-900/40 rounded-2xl border border-white/5">
-                 <div class="flex items-center gap-4 text-xs font-bold uppercase">
-                   <img src={p.imagen_url || '/placeholder.webp'} class="w-10 h-10 rounded-lg object-cover" />
-                   {p.titulo}
+        <section class="bg-slate-900/80 p-8 md:p-10 rounded-[2.5rem] border border-white/10 backdrop-blur-xl">
+           <h2 class="text-xs font-black uppercase tracking-widest text-emerald-400 mb-8 border-b border-white/5 pb-4">1. Ajustes Globales del Operador</h2>
+           
+           <form method="POST" enctype="multipart/form-data" class="space-y-8">
+              <input type="hidden" name="accion" value="actualizar_perfil" />
+              
+              <label class="inline-flex items-center gap-3 bg-slate-800/30 p-3 rounded-xl border border-white/5 cursor-pointer w-max">
+                  <input type="checkbox" name="disponible" checked={config.disponible === 'true'} class="w-4 h-4 accent-emerald-500" />
+                  <span class="text-[10px] font-bold uppercase tracking-tighter">Disponible para trabajar</span>
+              </label>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div class="space-y-2">
+                    <p class="text-[9px] font-black uppercase text-slate-500 ml-2">Nombre Principal</p>
+                    <input name="nombre" value={config.nombre} class="w-full bg-slate-800 p-4 rounded-xl border border-white/5 text-sm" />
                  </div>
-                 <form method="POST">
-                   <input type="hidden" name="accion" value="borrar_proyecto" />
-                   <input type="hidden" name="id" value={p.id} />
-                   <button class="text-[9px] font-black text-red-400 uppercase px-3 py-2 rounded-lg hover:bg-red-400/10">Borrar</button>
-                 </form>
+                 <div class="space-y-2">
+                    <p class="text-[9px] font-black uppercase text-slate-500 ml-2">Número WhatsApp</p>
+                    <input name="whatsapp_number" value={config.whatsapp_number} placeholder="Ej: 54911..." class="w-full bg-slate-800 p-4 rounded-xl border border-white/5 text-sm" />
+                 </div>
+
+                 <div class="space-y-2">
+                    <p class="text-[9px] font-black uppercase text-slate-500 ml-2">Biografía Corta (Hero)</p>
+                    <textarea name="bio" class="w-full bg-slate-800 p-4 rounded-xl border border-white/5 text-sm h-24 resize-none">{config.bio}</textarea>
+                 </div>
+                 <div class="space-y-2">
+                    <p class="text-[9px] font-black uppercase text-slate-500 ml-2">Mensaje Prearmado WhatsApp</p>
+                    <textarea name="whatsapp_msg" class="w-full bg-slate-800 p-4 rounded-xl border border-white/5 text-sm h-24 resize-none">{config.whatsapp_msg}</textarea>
+                 </div>
+
+                 <div class="space-y-2">
+                    <p class="text-[9px] font-black uppercase text-slate-500 ml-2">Radar Técnico (separado por coma)</p>
+                    <input name="radar_techs" value={config.radar_techs} class="w-full bg-slate-800 p-4 rounded-xl border border-white/5 text-sm" />
+                 </div>
+                 <div class="space-y-2">
+                    <p class="text-[9px] font-black uppercase text-slate-500 ml-2">Currículum PDF</p>
+                    <div class="w-full bg-slate-800 p-3 rounded-xl border border-white/5 flex items-center justify-between h-[54px]">
+                       <input type="file" name="cv_file" accept=".pdf" class="text-[10px] text-slate-400" />
+                       {config.cv_url && <a href={config.cv_url} target="_blank" class="text-[9px] text-blue-400 underline uppercase font-bold">Ver PDF</a>}
+                    </div>
+                 </div>
+              </div>
+
+              <div class="pt-8 mt-4 border-t border-white/5">
+                  <p class="text-[11px] font-black uppercase text-purple-400 mb-6">Datos Personales (Sección Sobre Mí)</p>
+                  
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      
+                      <div class="space-y-2">
+                          <p class="text-[9px] font-black uppercase text-slate-500 ml-2">Foto / Avatar</p>
+                          <div class="w-full bg-slate-800 p-2 rounded-xl border border-white/5 flex items-center gap-3 h-[54px]">
+                             {config.avatar_url ? (
+                               <img src={config.avatar_url} class="w-8 h-8 rounded-full object-cover border border-white/10 shrink-0" />
+                             ) : (
+                               <div class="w-8 h-8 rounded-full bg-slate-900 border border-white/10 shrink-0"></div>
+                             )}
+                             <input type="file" name="avatar_file" accept="image/*" class="text-[9px] text-slate-400 w-full" />
+                          </div>
+                      </div>
+
+                      <div class="space-y-2">
+                          <p class="text-[9px] font-black uppercase text-slate-500 ml-2">Ubicación</p>
+                          <input name="sobre_mi_id" value={config.sobre_mi_id} placeholder="Ej: Hudson, Buenos Aires" class="w-full bg-slate-800 p-4 rounded-xl border border-white/5 text-sm" />
+                      </div>
+
+                      <div class="space-y-2">
+                          <p class="text-[9px] font-black uppercase text-slate-500 ml-2">Fuera del teclado</p>
+                          <input name="sobre_mi_base" value={config.sobre_mi_base} placeholder="Ej: Fotografía, Bowling" class="w-full bg-slate-800 p-4 rounded-xl border border-white/5 text-sm" />
+                      </div>
+
+                      <div class="space-y-2 md:col-span-3">
+                          <p class="text-[9px] font-black uppercase text-slate-500 ml-2">Idiomas</p>
+                          <input name="sobre_mi_status" value={config.sobre_mi_status} placeholder="Ej: Español nativo, Inglés técnico" class="w-full bg-slate-800 p-4 rounded-xl border border-white/5 text-sm" />
+                      </div>
+
+                      <div class="space-y-2 md:col-span-3">
+                          <p class="text-[9px] font-black uppercase text-slate-500 ml-2">Texto Descriptivo</p>
+                          <textarea name="sobre_mi_texto" placeholder="Usá {{EDAD}} en el texto para calcular tu edad automática." class="w-full bg-slate-800 p-4 rounded-xl border border-white/5 text-sm h-40 resize-none">{config.sobre_mi_texto}</textarea>
+                      </div>
+                  </div>
+              </div>
+
+              <button class="w-full bg-emerald-600 py-5 rounded-xl font-black uppercase text-[11px] tracking-widest transition-all hover:bg-emerald-500 shadow-xl shadow-emerald-500/10 mt-4">Sincronizar Todos los Datos</button>
+           </form>
+        </section>
+
+        <section class="bg-slate-900 p-8 md:p-10 rounded-[2.5rem] border border-white/10">
+          <h2 class="text-xs font-black uppercase tracking-widest text-blue-500 mb-8 border-b border-white/5 pb-4">2. Desplegar Nuevo Proyecto</h2>
+          <form method="POST" enctype="multipart/form-data" class="space-y-6">
+            <input type="hidden" name="accion" value="guardar_proyecto" />
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div class="md:col-span-3 space-y-2">
+                  <p class="text-[9px] font-black uppercase text-slate-500 ml-2">Título del Proyecto</p>
+                  <input name="titulo" class="w-full bg-slate-800 p-4 rounded-xl border border-white/5 text-sm" required />
+              </div>
+              <div class="space-y-2">
+                  <p class="text-[9px] font-black uppercase text-slate-500 ml-2">Tipo</p>
+                  <select name="tipo" class="w-full bg-slate-800 p-4 rounded-xl border border-white/5 text-[11px] font-black uppercase outline-none text-white h-[54px]">
+                     <option value="SOFTWARE">SOFTWARE</option>
+                     <option value="HARDWARE">HARDWARE</option>
+                  </select>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+                <p class="text-[9px] font-black uppercase text-slate-500 ml-2">Descripción Técnica</p>
+                <textarea name="descripcion" class="w-full bg-slate-800 p-4 rounded-xl border border-white/5 h-24 text-sm resize-none outline-none"></textarea>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+               <div class="md:col-span-2 space-y-2">
+                   <p class="text-[9px] font-black uppercase text-slate-500 ml-2">Tags (Separados por coma)</p>
+                   <input name="tags" placeholder="Ej: Python, Docker, Astro" class="w-full bg-slate-800 p-4 rounded-xl border border-white/5 text-sm outline-none" />
+               </div>
+               <div class="space-y-2">
+                   <p class="text-[9px] font-black uppercase text-slate-500 ml-2">Imagen de Portada</p>
+                   <div class="w-full bg-slate-800 p-3 rounded-xl border border-white/5 flex items-center h-[54px]">
+                       <input type="file" name="proyecto_img" accept="image/*" class="text-[10px] text-slate-400 w-full" />
+                   </div>
+               </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+               <div class="space-y-2">
+                   <p class="text-[9px] font-black uppercase text-slate-500 ml-2">Link de Demostración (Demo)</p>
+                   <input name="demo_url" placeholder="https://tudemo.com" class="w-full bg-slate-800 p-4 rounded-xl border border-white/5 text-sm" />
+               </div>
+               <div class="space-y-2">
+                   <p class="text-[9px] font-black uppercase text-slate-500 ml-2">Link de GitHub (Código)</p>
+                   <input name="github_url" placeholder="https://github.com/tu-repo" class="w-full bg-slate-800 p-4 rounded-xl border border-white/5 text-sm" />
+               </div>
+            </div>
+
+            <button class="w-full bg-blue-600 py-5 rounded-xl font-black uppercase tracking-widest text-[11px] hover:bg-blue-500 transition-all shadow-xl shadow-blue-500/10">Ejecutar Despliegue en DB</button>
+          </form>
+        </section>
+
+        <section>
+          <h2 class="text-xs font-black uppercase tracking-widest text-slate-400 mb-6 px-2">3. Proyectos en Producción ({proyectosDB.length})</h2>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+             {proyectosDB.map(p => (
+               <div class="flex flex-col bg-slate-900/40 rounded-[2rem] border border-white/5 overflow-hidden group hover:border-blue-500/30 transition-colors">
+                 
+                 <div class="h-40 bg-slate-800 relative">
+                    <img src={p.imagen_url || '/placeholder.webp'} class="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" />
+                    <span class="absolute top-4 left-4 px-2 py-1 bg-black/80 backdrop-blur-md border border-white/10 rounded text-[9px] font-black uppercase text-blue-400">
+                        {p.tipo}
+                    </span>
+                 </div>
+                 
+                 <div class="p-6 flex flex-col flex-grow">
+                    <h3 class="text-lg font-bold uppercase truncate text-white mb-2 italic tracking-tighter">{p.titulo}</h3>
+                    <p class="text-xs text-slate-500 line-clamp-3 mb-6 flex-grow leading-relaxed">{p.descripcion}</p>
+                    
+                    <form method="POST" class="mt-auto pt-4 border-t border-white/5">
+                      <input type="hidden" name="accion" value="borrar_proyecto" />
+                      <input type="hidden" name="id" value={p.id} />
+                      <button class="w-full text-[10px] font-black text-red-400/80 uppercase tracking-widest py-3 rounded-xl bg-red-500/5 hover:bg-red-500 hover:text-white transition-all">
+                          Eliminar
+                      </button>
+                    </form>
+                 </div>
                </div>
              ))}
+             
+             {proyectosDB.length === 0 && (
+               <div class="col-span-full text-center py-20 border border-dashed border-white/10 rounded-[2.5rem] bg-slate-900/10">
+                  <p class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-600">No hay proyectos cargados en la base de datos</p>
+               </div>
+             )}
           </div>
-        </div>
+        </section>
+
       </div>
     )}
   </main>

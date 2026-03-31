@@ -1,18 +1,35 @@
 ---
 interface Props {
-	title: string;
+    title: string;
 }
 const { title } = Astro.props;
+
+// Magia pura: Genera la URL absoluta dependiendo de dónde estés alojado
+const imagenOpenGraph = new URL('/og-mobatai.jpg', Astro.url);
 ---
 <!DOCTYPE html>
 <html lang="es">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<title>{title}</title>
-	</head>
-	<body class="bg-slate-900 text-white font-sans antialiased">
-		<slot />
-	</body>
+    <head>
+        <script is:inline>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+        new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+        j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+        'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+        })(window,document,'script','dataLayer','GTM-NHBFPND2');</script>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width" />
+        
+        <meta property="og:title" content="Tomas Moreno | Developer" />
+        <meta property="og:description" content="Portfolio y sistema de despliegue de proyectos." />
+        <meta property="og:image" content={imagenOpenGraph} />
+        <meta property="og:type" content="website" />
+        <meta name="description" content="Portfolio de Tomas Moreno Bauer. Desarrollador especialista en software, hardware e infraestructura IT." />
+        
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <title>{title}</title>
+    </head>
+    <body class="bg-slate-900 text-white font-sans antialiased">
+        <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NHBFPND2"
+        height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+        <slot />
+    </body>
 </html>
