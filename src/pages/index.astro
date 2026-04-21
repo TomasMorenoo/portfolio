@@ -7,7 +7,18 @@ import db from '../lib/db.js';
 // Carga de DB
 const configArr = db.prepare('SELECT * FROM configuracion').all();
 const config = Object.fromEntries(configArr.map(i => [i.clave, i.valor]));
-const proyectosDB = db.prepare('SELECT * FROM proyectos ORDER BY id DESC').all();
+// Excluir Archivados del portfolio público; ordenar por campo orden
+const proyectosDB = db.prepare("SELECT * FROM proyectos WHERE estado != 'Archivado' ORDER BY orden DESC").all();
+
+// Precálculo de imagen: usa imagen manual, o screenshot automático vía WordPress mshots, o placeholder
+const proyectos = proyectosDB.map(p => ({
+  ...p,
+  _imgSrc: p.imagen_url
+    ? p.imagen_url
+    : p.demo_url
+      ? `https://s.wordpress.com/mshots/v1/${encodeURIComponent(p.demo_url)}?w=800&h=450`
+      : '/placeholder.webp'
+}));
 
 // Obtener las tecnologías del Admin y convertirlas en un Array limpio
 const radarTechsString = config.radar_techs || 'html,css,js,astro,tailwind,python,flask,sqlite,postgres,linux,docker,git,github';
@@ -68,7 +79,7 @@ if (mes < 0 || (mes === 0 && hoy.getDate() < fechaNacimiento.getDate())) {
         </a>
         
         {config.disponible === 'true' ? (
-          <a id="btn-contacto" href={WHATSAPP_LINK} target="_blank" class="w-full sm:w-1/3 bg-emerald-600 hover:bg-emerald-500 transition-all text-white px-6 py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] text-center shadow-xl shadow-emerald-600/20">
+          <a id="btn-contacto" href={WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" class="w-full sm:w-1/3 bg-emerald-600 hover:bg-emerald-500 transition-all text-white px-6 py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] text-center shadow-xl shadow-emerald-600/20">
             Contacto Directo
           </a>
         ) : (
@@ -78,7 +89,7 @@ if (mes < 0 || (mes === 0 && hoy.getDate() < fechaNacimiento.getDate())) {
         )}
         
         {config.cv_url ? (
-          <a id="btn-descargar-cv" href={config.cv_url} download class="w-full sm:w-1/3 bg-blue-600/10 border border-blue-500/20 hover:bg-blue-600/20 transition-all text-blue-400 px-6 py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] text-center">
+          <a id="btn-descargar-cv" href={config.cv_url} download rel="noopener noreferrer" class="w-full sm:w-1/3 bg-blue-600/10 border border-blue-500/20 hover:bg-blue-600/20 transition-all text-blue-400 px-6 py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] text-center">
             Descargar CV
           </a>
         ) : null}
@@ -89,7 +100,7 @@ if (mes < 0 || (mes === 0 && hoy.getDate() < fechaNacimiento.getDate())) {
       <div class="flex flex-col items-center gap-4">
         <p class="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">Tecnologías de Cabecera</p>
         
-        <div class="flex w-full relative">
+        <div class="flex w-full relative group">
           <div class="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-[#0f172a] to-transparent z-10 pointer-events-none"></div>
           <div class="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-[#0f172a] to-transparent z-10 pointer-events-none"></div>
 
@@ -211,30 +222,44 @@ if (mes < 0 || (mes === 0 && hoy.getDate() < fechaNacimiento.getDate())) {
         <div class="h-px flex-grow bg-white/5"></div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
-        {proyectosDB.map((p) => (
-          <div class="group bg-slate-900/40 border border-white/5 rounded-[2.5rem] overflow-hidden hover:border-blue-500/30 hover:shadow-[0_0_40px_-10px_rgba(59,130,246,0.15)] transition-all duration-500 flex flex-col h-full">
-            
-            <div class="h-64 bg-slate-800 relative overflow-hidden">
+      <!-- Filtros por estado -->
+      {proyectos.some(p => p.estado === 'En desarrollo') && (
+        <div class="flex flex-wrap gap-2 mb-10">
+          <button class="filter-btn active text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-xl bg-white/10 border border-white/10 text-white transition-all" data-filter="all">Todos</button>
+          <button class="filter-btn text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-xl bg-white/5 border border-white/5 text-slate-500 hover:text-white transition-all" data-filter="Terminado">Terminados</button>
+          <button class="filter-btn text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-xl bg-white/5 border border-white/5 text-slate-500 hover:text-white transition-all" data-filter="En desarrollo">En desarrollo</button>
+        </div>
+      )}
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-12" id="proyectos-grid">
+        {proyectos.map((p) => (
+          <div class="proyecto-card group bg-slate-900/40 border border-white/5 rounded-[2.5rem] overflow-hidden hover:border-blue-500/30 hover:shadow-[0_0_40px_-10px_rgba(59,130,246,0.15)] transition-all duration-500 flex flex-col h-full" data-estado={p.estado || 'Terminado'}>
+
+            <div class="h-80 bg-slate-800 relative overflow-hidden">
               <div class="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent z-10"></div>
-              <img src={p.imagen_url || '/placeholder.webp'} alt={p.titulo} class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-60 group-hover:opacity-100" />
+              <img src={p._imgSrc} alt={p.titulo} class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-60 group-hover:opacity-100" loading="lazy" />
               <div class="absolute top-6 left-6 z-20">
                 <span class="px-3 py-1.5 bg-white/10 backdrop-blur-md border border-white/10 rounded-full text-[9px] font-black uppercase tracking-widest text-white">{p.tipo}</span>
               </div>
+              {!p.imagen_url && p.demo_url && (
+                <div class="absolute bottom-4 right-4 z-20">
+                  <span class="px-2 py-1 bg-black/60 backdrop-blur-md border border-white/10 rounded-lg text-[8px] font-bold uppercase tracking-widest text-slate-400">Preview en vivo</span>
+                </div>
+              )}
             </div>
-            
-            <div class="p-8 flex flex-col flex-grow relative z-20 -mt-6 bg-slate-900/90 backdrop-blur-2xl rounded-t-[2rem]">
+
+            <div class="p-8 flex flex-col flex-grow relative z-20 bg-slate-900/90 backdrop-blur-2xl">
               <h3 class="text-2xl font-black mb-3 text-white uppercase italic tracking-tighter group-hover:text-blue-400 transition-colors">{p.titulo}</h3>
               <p class="text-slate-400 text-sm leading-relaxed mb-6 flex-grow line-clamp-3">{p.descripcion}</p>
-              
-              <div class="flex flex-wrap gap-2 mb-8">
+
+              <div class="flex flex-wrap gap-2 mb-6">
                 {p.tags?.split(',').filter(t => t.trim() !== '').map(tag => {
                   const cleanTag = tag.trim().toLowerCase();
                   return (
                     <div class="flex items-center gap-1.5 px-2.5 py-1 bg-slate-800 border border-white/5 rounded-lg group-hover:border-white/10 transition-colors shadow-sm">
-                      <img 
-                        src={`https://skillicons.dev/icons?i=${cleanTag}&theme=dark`} 
-                        alt={cleanTag} 
+                      <img
+                        src={`https://skillicons.dev/icons?i=${cleanTag}&theme=dark`}
+                        alt={cleanTag}
                         class="w-4 h-4 rounded-sm"
                         onerror="this.style.display='none'"
                       />
@@ -246,11 +271,34 @@ if (mes < 0 || (mes === 0 && hoy.getDate() < fechaNacimiento.getDate())) {
                 })}
               </div>
 
+              {(p.demo_usuario || p.demo_password) && (
+                <div class="flex items-center flex-wrap gap-x-4 gap-y-1 mb-6 px-4 py-3 bg-amber-500/5 border border-amber-500/20 rounded-xl">
+                  <span class="text-[9px] font-black uppercase tracking-widest text-amber-400/80 shrink-0">Acceso Demo</span>
+                  <div class="h-3 w-px bg-amber-500/20 hidden sm:block shrink-0"></div>
+                  {p.demo_usuario && (
+                    <span class="text-[9px] text-slate-400">
+                      Usuario: <span class="text-white font-bold font-mono select-all">{p.demo_usuario}</span>
+                    </span>
+                  )}
+                  {p.demo_password && (
+                    <span class="text-[9px] text-slate-400">
+                      Pass: <span class="text-white font-bold font-mono select-all">{p.demo_password}</span>
+                    </span>
+                  )}
+                </div>
+              )}
+
               <div class="mt-auto pt-6 border-t border-white/5 grid grid-cols-2 gap-4">
                 {p.demo_url ? (
-                  <a href={p.demo_url} target="_blank" class="bg-blue-600 hover:bg-blue-500 transition-all text-white py-4 rounded-xl flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[10px]">
+                  <button
+                    class="demo-btn bg-blue-600 hover:bg-blue-500 transition-all text-white py-4 rounded-xl flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[10px] cursor-pointer"
+                    data-id={p.id}
+                    data-url={p.demo_url}
+                    data-usuario={p.demo_usuario || ''}
+                    data-password={p.demo_password || ''}
+                  >
                     <span>Ver Demo</span>
-                  </a>
+                  </button>
                 ) : (
                   <div class="bg-slate-800/30 border border-white/5 text-slate-500 py-4 rounded-xl flex items-center justify-center font-black uppercase tracking-widest text-[9px] cursor-not-allowed">
                     Demo Privada
@@ -258,9 +306,13 @@ if (mes < 0 || (mes === 0 && hoy.getDate() < fechaNacimiento.getDate())) {
                 )}
 
                 {p.github_url ? (
-                  <a href={p.github_url} target="_blank" class="bg-slate-800 border border-white/10 hover:bg-white/5 transition-all text-white py-4 rounded-xl flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[10px]">
+                  <button
+                    class="github-btn bg-slate-800 border border-white/10 hover:bg-white/5 transition-all text-white py-4 rounded-xl flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[10px] cursor-pointer"
+                    data-id={p.id}
+                    data-url={p.github_url}
+                  >
                     <span>Ver Código</span>
-                  </a>
+                  </button>
                 ) : (
                   <div class="bg-slate-800/30 border border-white/5 text-slate-500 py-4 rounded-xl flex items-center justify-center font-black uppercase tracking-widest text-[9px] cursor-not-allowed">
                     Código Privado
@@ -276,8 +328,94 @@ if (mes < 0 || (mes === 0 && hoy.getDate() < fechaNacimiento.getDate())) {
 
   </main>
 
+  <!-- ── CONTACTO ─────────────────────────────────────────────────────── -->
+  <section id="contacto" class="scroll-mt-32 max-w-6xl mx-auto px-6 pb-32">
+    <div class="flex items-center gap-6 mb-16 px-2">
+      <h2 class="text-2xl md:text-4xl font-black italic uppercase tracking-tighter text-white">Contacto</h2>
+      <div class="h-px flex-grow bg-white/5"></div>
+    </div>
+
+    <div class="bg-slate-900/20 border border-white/5 p-10 md:p-16 rounded-[2.5rem] flex flex-col items-center text-center gap-10">
+      <p class="text-slate-400 text-lg max-w-xl leading-relaxed">
+        ¿Tenés un proyecto en mente o querés hablar de algo? Escribime directo.
+      </p>
+
+      <div class="flex flex-col sm:flex-row gap-4 w-full max-w-lg justify-center">
+        {config.disponible === 'true' && config.whatsapp_number ? (
+          <a href={WHATSAPP_LINK} target="_blank" rel="noopener noreferrer"
+             class="flex-1 bg-emerald-600 hover:bg-emerald-500 transition-all text-white px-6 py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] text-center shadow-xl shadow-emerald-600/20">
+            WhatsApp
+          </a>
+        ) : null}
+        {config.email ? (
+          <a href={`mailto:${config.email}`}
+             class="flex-1 bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-white px-6 py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] text-center">
+            Email
+          </a>
+        ) : null}
+      </div>
+
+      {(config.github_url || config.linkedin_url) && (
+        <div class="flex items-center gap-8 pt-2">
+          {config.github_url && (
+            <a href={config.github_url} target="_blank" rel="noopener noreferrer" class="text-slate-500 hover:text-white transition-colors" aria-label="GitHub">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+            </a>
+          )}
+          {config.linkedin_url && (
+            <a href={config.linkedin_url} target="_blank" rel="noopener noreferrer" class="text-slate-500 hover:text-white transition-colors" aria-label="LinkedIn">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  </section>
+
   <Footer />
+
+  <!-- Toast de credenciales copiadas -->
+  <div id="cred-toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 bg-slate-900 border border-white/10 shadow-2xl px-6 py-4 rounded-2xl opacity-0 pointer-events-none transition-all duration-300 translate-y-4">
+    <span class="text-emerald-400 text-lg">📋</span>
+    <div class="flex flex-col">
+      <span id="cred-toast-title" class="text-[10px] font-black uppercase tracking-widest text-white"></span>
+      <span class="text-[9px] text-slate-400 uppercase tracking-widest">Abriendo demo en 1 segundo...</span>
+    </div>
+  </div>
 </Layout>
+
+<script>
+  document.querySelectorAll('.demo-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const url      = btn.dataset.url;
+      const usuario  = btn.dataset.usuario;
+      const password = btn.dataset.password;
+      const toast    = document.getElementById('cred-toast');
+      const title    = document.getElementById('cred-toast-title');
+
+      if (password && navigator.clipboard) {
+        // Copia contraseña al portapapeles
+        navigator.clipboard.writeText(password).then(() => {
+          const lineas = [];
+          if (usuario)  lineas.push(`Usuario: ${usuario}`);
+          if (password) lineas.push(`Pass copiada: ${password}`);
+          title.textContent = lineas.join('  |  ');
+          toast.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-4');
+          toast.classList.add('opacity-100', 'translate-y-0');
+          setTimeout(() => {
+            window.open(url, '_blank', 'noopener,noreferrer');
+            setTimeout(() => {
+              toast.classList.add('opacity-0', 'pointer-events-none', 'translate-y-4');
+              toast.classList.remove('opacity-100', 'translate-y-0');
+            }, 2000);
+          }, 1000);
+        });
+      } else {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+    });
+  });
+</script>
 
 <style>
   @keyframes scroll {
@@ -293,5 +431,10 @@ if (mes < 0 || (mes === 0 && hoy.getDate() < fechaNacimiento.getDate())) {
   }
   :root {
     color-scheme: dark;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-scroll {
+      animation: none;
+    }
   }
 </style>

@@ -47,6 +47,43 @@ if (!tieneGithubUrl) {
   console.log("🚀 Migración exitosa: Columna 'github_url' agregada automáticamente.");
 }
 
+const tieneDemoUsuario = columnasProyectos.some(c => c.name === 'demo_usuario');
+if (!tieneDemoUsuario) {
+  db.exec("ALTER TABLE proyectos ADD COLUMN demo_usuario TEXT;");
+  console.log("🚀 Migración exitosa: Columna 'demo_usuario' agregada automáticamente.");
+}
+
+const tieneDemoPassword = columnasProyectos.some(c => c.name === 'demo_password');
+if (!tieneDemoPassword) {
+  db.exec("ALTER TABLE proyectos ADD COLUMN demo_password TEXT;");
+  console.log("🚀 Migración exitosa: Columna 'demo_password' agregada automáticamente.");
+}
+
+const tieneOrden = columnasProyectos.some(c => c.name === 'orden');
+if (!tieneOrden) {
+  db.exec("ALTER TABLE proyectos ADD COLUMN orden INTEGER DEFAULT 0;");
+  db.exec("UPDATE proyectos SET orden = id WHERE orden = 0;");
+  console.log("🚀 Migración exitosa: Columna 'orden' agregada. Proyectos existentes preservados.");
+}
+
+const tieneEstado = columnasProyectos.some(c => c.name === 'estado');
+if (!tieneEstado) {
+  db.exec("ALTER TABLE proyectos ADD COLUMN estado TEXT DEFAULT 'Terminado';");
+  console.log("🚀 Migración exitosa: Columna 'estado' agregada.");
+}
+
+const tieneVisitasDemo = columnasProyectos.some(c => c.name === 'visitas_demo');
+if (!tieneVisitasDemo) {
+  db.exec("ALTER TABLE proyectos ADD COLUMN visitas_demo INTEGER DEFAULT 0;");
+  console.log("🚀 Migración exitosa: Columna 'visitas_demo' agregada.");
+}
+
+const tieneVisitasCodigo = columnasProyectos.some(c => c.name === 'visitas_codigo');
+if (!tieneVisitasCodigo) {
+  db.exec("ALTER TABLE proyectos ADD COLUMN visitas_codigo INTEGER DEFAULT 0;");
+  console.log("🚀 Migración exitosa: Columna 'visitas_codigo' agregada.");
+}
+
 // ==========================================
 
 // Inserción de configuración básica
@@ -65,5 +102,7 @@ seed('sobre_mi_id', 'Tomas Agustin Moreno Bauer');
 seed('sobre_mi_base', 'Buenos Aires, ARG');
 seed('sobre_mi_status', 'Estudiante UTN');
 seed('sobre_mi_texto', 'Mi día a día transcurre en el soporte IT, resolviendo problemas de infraestructura y asegurando que hardware y software se comuniquen sin fricciones.\n\nTambién me enfoco en orquestar despliegues de aplicaciones en VPS utilizando Docker y desarrollando con Python y JavaScript.');
+seed('github_url', '');
+seed('linkedin_url', '');
 
 export default db;
